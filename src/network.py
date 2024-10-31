@@ -9,16 +9,18 @@ simple, easily readable, and easily modifiable.  It is not optimized,
 and omits many desirable features.
 """
 
-#### Libraries
+# Libraries
 # Standard library
 import random
 
 # Third-party libraries
 import numpy as np
+import time
+
 
 class Network(object):
 
-    def __init__(self, sizes):
+    def __init__(self, sizes=None,saves=None):
         """The list ``sizes`` contains the number of neurons in the
         respective layers of the network.  For example, if the list
         was [2, 3, 1] then it would be a three-layer network, with the
@@ -29,11 +31,23 @@ class Network(object):
         layer is assumed to be an input layer, and by convention we
         won't set any biases for those neurons, since biases are only
         ever used in computing the outputs from later layers."""
-        self.num_layers = len(sizes)
         self.sizes = sizes
-        self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
-        self.weights = [np.random.randn(y, x)
-                        for x, y in zip(sizes[:-1], sizes[1:])]
+        self.preprocessing=0
+        try:
+            if saves:
+                tmp1 = np.load(saves[0],allow_pickle=True)
+                tmp2 = np.load(saves[1],allow_pickle=True)
+                self.weights = tmp1
+                self.biases = tmp2
+                self.num_layers=len(self.biases)+1
+            else:
+                raise OSError
+        except OSError:
+            print("save not exist!")
+            self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
+            self.weights = [np.random.randn(y, x)
+                            for x, y in zip(sizes[:-1], sizes[1:])]
+            self.num_layers = len(sizes)
 
     def feedforward(self, a):
         """Return the output of the network if ``a`` is input."""
@@ -51,32 +65,48 @@ class Network(object):
         network will be evaluated against the test data after each
         epoch, and partial progress printed out.  This is useful for
         tracking progress, but slows things down substantially."""
-        if test_data: n_test = len(test_data)
+        # fig=plt.figure()
+        if test_data:
+            n_test = len(test_data)
         n = len(training_data)
         for j in xrange(epochs):
+            start_time = time.time()
+            for i in range(len(training_data)):
+                training_data[i]=[training_data[i][0].flatten(),training_data[i][1]]
             random.shuffle(training_data)
             mini_batches = [
                 training_data[k:k+mini_batch_size]
                 for k in xrange(0, n, mini_batch_size)]
+            # fig.add_subplot(1,2,1)
+            # plt.imshow(mini_batches[15][8][0].reshape(28,28), cmap=plt.get_cmap('gray'))
+            # plt.title(mini_batches[15][8][1])
+            # plt.show()
             for mini_batch in mini_batches:
                 self.update_mini_batch(mini_batch, eta)
             if test_data:
-                print "Epoch {0}: {1} / {2}".format(
-                    j, self.evaluate(test_data), n_test)
+                print("Epoch {0}: {1} / {2}".format(
+                    j, self.evaluate(test_data), n_test))
             else:
-                print "Epoch {0} complete".format(j)
+                print("Epoch {0} complete".format(j))
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print("Epoch Elapsed time: {0} seconds\Preprocessing time: {1} seconds".format(elapsed_time,self.preprocessing))
+            self.preprocessing=0
+            np.save("data/save/weights.npy", self.weights)
+            np.save("data/save/biases.npy", self.biases)
 
     def update_mini_batch(self, mini_batch, eta):
         """Update the network's weights and biases by applying
         gradient descent using backpropagation to a single mini batch.
         The ``mini_batch`` is a list of tuples ``(x, y)``, and ``eta``
         is the learning rate."""
-        nabla_b = [np.zeros(b.shape) for b in self.biases]
-        nabla_w = [np.zeros(w.shape) for w in self.weights]
-        for x, y in mini_batch:
-            delta_nabla_b, delta_nabla_w = self.backprop(x, y)
-            nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
-            nabla_w = [nw+dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
+        # nabla_b = [np.zeros(b.shape) for b in self.biases]
+        # nabla_w = [np.zeros(w.shape) for w in self.weights]
+        # for x, y in mini_batch:
+        #     delta_nabla_b, delta_nabla_w = self.backprop(x, y)
+        #     nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
+        #     nabla_w = [nw+dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
+        nabla_b,nabla_w=self.my_backprop(mini_batch)
         self.weights = [w-(eta/len(mini_batch))*nw
                         for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b-(eta/len(mini_batch))*nb
@@ -91,8 +121,8 @@ class Network(object):
         nabla_w = [np.zeros(w.shape) for w in self.weights]
         # feedforward
         activation = x
-        activations = [x] # list to store all the activations, layer by layer
-        zs = [] # list to store all the z vectors, layer by layer
+        activations = [x]  # list to store all the activations, layer by layer
+        zs = []  # list to store all the z vectors, layer by layer
         for b, w in zip(self.biases, self.weights):
             z = np.dot(w, activation)+b
             zs.append(z)
@@ -116,6 +146,59 @@ class Network(object):
             nabla_b[-l] = delta
             nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
         return (nabla_b, nabla_w)
+    
+    def my_backprop(self,mini_batch):
+        """Return a tuple ``(nabla_b, nabla_w)`` representing the
+        gradient for the cost function C_x.  ``nabla_b`` and
+        ``nabla_w`` are layer-by-layer lists of numpy arrays, similar
+        to ``self.biases`` and ``self.weights``."""
+        nabla_b = [np.zeros(b.shape) for b in self.biases]
+        nabla_w = [np.zeros(w.shape) for w in self.weights]
+        start_time = time.time()
+        x=[item[0] for item in mini_batch]
+        y=[item[1] for item in mini_batch]
+        # for i in range(len(x)):
+        #     x[i]=x[i].tolist()
+        #     x[i]=[item[0] for item in x[i]]
+        for i in range(len(y)):
+            y[i]=[item[0] for item in y[i]]
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        self.preprocessing+=elapsed_time
+        x=np.array(x)
+        y=np.array(y)
+        x=x.transpose()
+        y=y.transpose()
+        
+        # print("mini-batch preprocessing time Elapsed time: {0} seconds".format(elapsed_time))
+        
+        # feedforward
+        activation = x
+        activations = [x]  # list to store all the activations, layer by layer
+        zs = []  # list to store all the z vectors, layer by layer
+        for b, w in zip(self.biases, self.weights):
+            z = np.dot(w, activation)+b
+            zs.append(z)
+            activation = sigmoid(z)
+            activations.append(activation)
+        # backward pass
+        delta = self.cost_derivative(activations[-1], y) * \
+            sigmoid_prime(zs[-1])
+        nabla_b[-1] = delta.sum(axis=1,keepdims=True)
+        nabla_w[-1] = np.dot(delta, activations[-2].transpose())
+        # Note that the variable l in the loop below is used a little
+        # differently to the notation in Chapter 2 of the book.  Here,
+        # l = 1 means the last layer of neurons, l = 2 is the
+        # second-last layer, and so on.  It's a renumbering of the
+        # scheme in the book, used here to take advantage of the fact
+        # that Python can use negative indices in lists.
+        for l in xrange(2, self.num_layers):
+            z = zs[-l]
+            sp = sigmoid_prime(z)
+            delta = np.dot(self.weights[-l+1].transpose(), delta) * sp
+            nabla_b[-l] = delta.sum(axis=1,keepdims=True)
+            nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
+        return (nabla_b, nabla_w)
 
     def evaluate(self, test_data):
         """Return the number of test inputs for which the neural
@@ -131,10 +214,13 @@ class Network(object):
         \partial a for the output activations."""
         return (output_activations-y)
 
-#### Miscellaneous functions
+# Miscellaneous functions
+
+
 def sigmoid(z):
     """The sigmoid function."""
     return 1.0/(1.0+np.exp(-z))
+
 
 def sigmoid_prime(z):
     """Derivative of the sigmoid function."""
