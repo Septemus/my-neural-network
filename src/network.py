@@ -16,7 +16,7 @@ import random
 # Third-party libraries
 import numpy as np
 import time
-
+import crossEntropy
 
 class Network(object):
 
@@ -69,14 +69,14 @@ class Network(object):
         if test_data:
             n_test = len(test_data)
         n = len(training_data)
-        for j in xrange(epochs):
+        for j in range(epochs):
             start_time = time.time()
             for i in range(len(training_data)):
                 training_data[i]=[training_data[i][0].flatten(),training_data[i][1]]
             random.shuffle(training_data)
             mini_batches = [
                 training_data[k:k+mini_batch_size]
-                for k in xrange(0, n, mini_batch_size)]
+                for k in range(0, n, mini_batch_size)]
             # fig.add_subplot(1,2,1)
             # plt.imshow(mini_batches[15][8][0].reshape(28,28), cmap=plt.get_cmap('gray'))
             # plt.title(mini_batches[15][8][1])
@@ -139,7 +139,7 @@ class Network(object):
         # second-last layer, and so on.  It's a renumbering of the
         # scheme in the book, used here to take advantage of the fact
         # that Python can use negative indices in lists.
-        for l in xrange(2, self.num_layers):
+        for l in range(2, self.num_layers):
             z = zs[-l]
             sp = sigmoid_prime(z)
             delta = np.dot(self.weights[-l+1].transpose(), delta) * sp
@@ -182,8 +182,7 @@ class Network(object):
             activation = sigmoid(z)
             activations.append(activation)
         # backward pass
-        delta = self.cost_derivative(activations[-1], y) * \
-            sigmoid_prime(zs[-1])
+        delta = crossEntropy.crossEntropy.delta(zs[-1],activations[-1],y)
         nabla_b[-1] = delta.sum(axis=1,keepdims=True)
         nabla_w[-1] = np.dot(delta, activations[-2].transpose())
         # Note that the variable l in the loop below is used a little
@@ -192,7 +191,7 @@ class Network(object):
         # second-last layer, and so on.  It's a renumbering of the
         # scheme in the book, used here to take advantage of the fact
         # that Python can use negative indices in lists.
-        for l in xrange(2, self.num_layers):
+        for l in range(2, self.num_layers):
             z = zs[-l]
             sp = sigmoid_prime(z)
             delta = np.dot(self.weights[-l+1].transpose(), delta) * sp
@@ -207,7 +206,11 @@ class Network(object):
         neuron in the final layer has the highest activation."""
         test_results = [(np.argmax(self.feedforward(x)), y)
                         for (x, y) in test_data]
-        return sum(int(x == y) for (x, y) in test_results)
+        try:
+            ret = sum(int(x == y) for (x, y) in test_results)
+        except TypeError:
+            ret = sum(int(x == np.argmax(y)) for (x, y) in test_results)
+        return ret
 
     def cost_derivative(self, output_activations, y):
         """Return the vector of partial derivatives \partial C_x /
