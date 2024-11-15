@@ -17,6 +17,18 @@ import random
 import numpy as np
 import time
 import crossEntropy
+import matplotlib.pyplot as plt
+
+#### Miscellaneous functions
+def vectorized_result(j):
+    """Return a 10-dimensional unit vector with a 1.0 in the j'th position
+    and zeroes elsewhere.  This is used to convert a digit (0...9)
+    into a corresponding desired output from the neural network.
+
+    """
+    e = np.zeros((10, 1))
+    e[j] = 1.0
+    return e
 
 class Network(object):
 
@@ -51,12 +63,14 @@ class Network(object):
 
     def feedforward(self, a):
         """Return the output of the network if ``a`` is input."""
+        a=a.reshape(len(a),1)
         for b, w in zip(self.biases, self.weights):
             a = sigmoid(np.dot(w, a)+b)
         return a
 
     def SGD(self, training_data, epochs, mini_batch_size, eta,
-            test_data=None):
+            lmda=0.0,
+            evaluationData=None,monitor_evaluation_cost=True,monitor_training_cost=True,monitor_evaluation_accuracy=True,monitor_training_accuracy=True):
         """Train the neural network using mini-batch stochastic
         gradient descent.  The ``training_data`` is a list of tuples
         ``(x, y)`` representing the training inputs and the desired
@@ -66,9 +80,11 @@ class Network(object):
         epoch, and partial progress printed out.  This is useful for
         tracking progress, but slows things down substantially."""
         # fig=plt.figure()
-        if test_data:
-            n_test = len(test_data)
+        if evaluationData:
+            n_test = len(evaluationData)
         n = len(training_data)
+        training_cost,evaluation_cost=[],[]
+        training_accuracy,evaluation_accuracy=[],[]
         for j in range(epochs):
             start_time = time.time()
             for i in range(len(training_data)):
@@ -83,17 +99,51 @@ class Network(object):
             # plt.show()
             for mini_batch in mini_batches:
                 self.update_mini_batch(mini_batch, eta)
-            if test_data:
-                print("Epoch {0}: {1} / {2}".format(
-                    j, self.evaluate(test_data), n_test))
-            else:
-                print("Epoch {0} complete".format(j))
+            if monitor_evaluation_cost and evaluationData:
+                cost=self.total_cost(evaluationData,lmda)
+                evaluation_cost.append(cost)
+                print("Cost on evaluation data: {}".format(cost))
+            if monitor_training_cost:
+                cost=self.total_cost(training_data,lmda)
+                training_cost.append(cost)
+                print("Cost on training data: {}".format(cost))
+            if monitor_evaluation_accuracy and evaluationData:
+                correct=self.evaluate(evaluationData)
+                acc=correct/(n_test*1.0)
+                acc*=100
+                evaluation_accuracy.append(acc)
+                print("Accuracy on evaluation data: {0} / {1} ({2}%)".format(correct, n_test,acc))
+            if monitor_training_accuracy:
+                correct=self.evaluate(training_data)
+                acc=correct/(n*1.0)
+                acc*=100
+                training_accuracy.append(acc)
+                print("Accuracy on training data: {0} / {1} ({2}%)".format(correct, n,acc))
             end_time = time.time()
             elapsed_time = end_time - start_time
-            print("Epoch Elapsed time: {0} seconds\Preprocessing time: {1} seconds".format(elapsed_time,self.preprocessing))
+            
+            print("Epoch Elapsed time: {0} seconds\nPreprocessing time: {1} seconds\n".format(elapsed_time,self.preprocessing))
+            print("Epoch {0} complete\n".format(j))
             self.preprocessing=0
             np.save("data/save/weights.npy", self.weights)
             np.save("data/save/biases.npy", self.biases)
+        
+        plt.subplot(1,2,1)
+        plt.plot(range(epochs),training_cost)
+        plt.plot(range(epochs),evaluation_cost)
+        plt.legend(["training cost","evaluation cost"])
+        plt.title("cost function curve")
+        plt.xlabel("epoch")
+        plt.ylabel("cost")
+        
+        plt.subplot(1,2,2)
+        plt.plot(range(epochs),training_accuracy)
+        plt.plot(range(epochs),evaluation_accuracy)
+        plt.legend(["training accuracy","evaluation accuracy"])
+        plt.title("accuracy function curve")
+        plt.xlabel("epoch")
+        plt.ylabel("accuracy")
+        plt.show()
 
     def update_mini_batch(self, mini_batch, eta):
         """Update the network's weights and biases by applying
@@ -216,6 +266,19 @@ class Network(object):
         """Return the vector of partial derivatives \partial C_x /
         \partial a for the output activations."""
         return (output_activations-y)
+    
+    def total_cost(self,target_data,lmda=0.0):
+        ret=0.0
+        for x,y in target_data:
+            a=self.feedforward(x)
+            try:
+                ret+=(crossEntropy.crossEntropy.fn(a,y)/len(target_data))
+            except TypeError:
+                y=vectorized_result(y)
+                ret+=crossEntropy.crossEntropy.fn(a,y)/len(target_data)
+        ret += 0.5*(lmda/len(target_data))*sum(
+            np.linalg.norm(w)**2 for w in self.weights)
+        return ret
 
 # Miscellaneous functions
 
