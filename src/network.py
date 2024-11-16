@@ -78,6 +78,7 @@ class Network(object):
         epoch, and partial progress printed out.  This is useful for
         tracking progress, but slows things down substantially."""
         # fig=plt.figure()
+        eta_decay_count=0
         if evaluationData:
             n_test = len(evaluationData)
         n = len(training_data)
@@ -131,6 +132,11 @@ class Network(object):
             # np.save("data/save/weights.npy", self.weights)
             # np.save("data/save/biases.npy", self.biases)
             self.save("data/save/model.json")
+            if(monitor_evaluation_accuracy and evaluation_accuracy and j>5):
+                if(evaluation_accuracy[j]<evaluation_accuracy[j-5] and eta_decay_count<10):
+                    eta/=2.0
+                    eta_decay_count+=1
+                    
 
         plt.subplot(1, 2, 1)
         plt.plot(range(epochs), training_cost)
