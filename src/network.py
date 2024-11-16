@@ -20,7 +20,9 @@ import crossEntropy
 import matplotlib.pyplot as plt
 import json
 
-#### Miscellaneous functions
+# Miscellaneous functions
+
+
 def vectorized_result(j):
     """Return a 10-dimensional unit vector with a 1.0 in the j'th position
     and zeroes elsewhere.  This is used to convert a digit (0...9)
@@ -30,6 +32,7 @@ def vectorized_result(j):
     e = np.zeros((10, 1))
     e[j] = 1.0
     return e
+
 
 class Network(object):
 
@@ -45,24 +48,25 @@ class Network(object):
         won't set any biases for those neurons, since biases are only
         ever used in computing the outputs from later layers."""
         self.sizes = sizes
-        self.preprocessing=0
+        self.preprocessing = 0
         self.num_layers = len(sizes)
         self.weight_initializer()
-            
+
     def weight_initializer(self):
         self.biases = [np.random.randn(y, 1) for y in self.sizes[1:]]
-        self.weights = [np.random.randn(y, x)/np.sqrt(x) for x, y in zip(self.sizes[:-1], self.sizes[1:])]
+        self.weights = [np.random.randn(y, x)/np.sqrt(x)
+                        for x, y in zip(self.sizes[:-1], self.sizes[1:])]
 
     def feedforward(self, a):
         """Return the output of the network if ``a`` is input."""
-        a=a.reshape(len(a),1)
+        a = a.reshape(len(a), 1)
         for b, w in zip(self.biases, self.weights):
             a = sigmoid(np.dot(w, a)+b)
         return a
 
     def SGD(self, training_data, epochs, mini_batch_size, eta,
             lmda=0.0,
-            evaluationData=None,monitor_evaluation_cost=True,monitor_training_cost=True,monitor_evaluation_accuracy=True,monitor_training_accuracy=True):
+            evaluationData=None, monitor_evaluation_cost=True, monitor_training_cost=True, monitor_evaluation_accuracy=True, monitor_training_accuracy=True):
         """Train the neural network using mini-batch stochastic
         gradient descent.  The ``training_data`` is a list of tuples
         ``(x, y)`` representing the training inputs and the desired
@@ -75,12 +79,13 @@ class Network(object):
         if evaluationData:
             n_test = len(evaluationData)
         n = len(training_data)
-        training_cost,evaluation_cost=[],[]
-        training_accuracy,evaluation_accuracy=[],[]
+        training_cost, evaluation_cost = [], []
+        training_accuracy, evaluation_accuracy = [], []
         for j in range(epochs):
             start_time = time.time()
             for i in range(len(training_data)):
-                training_data[i]=[training_data[i][0].flatten(),training_data[i][1]]
+                training_data[i] = [training_data[i]
+                                    [0].flatten(), training_data[i][1]]
             random.shuffle(training_data)
             mini_batches = [
                 training_data[k:k+mini_batch_size]
@@ -90,55 +95,58 @@ class Network(object):
             # plt.title(mini_batches[15][8][1])
             # plt.show()
             for mini_batch in mini_batches:
-                self.update_mini_batch(mini_batch, eta,n,lmda)
+                self.update_mini_batch(mini_batch, eta, n, lmda)
             if monitor_evaluation_cost and evaluationData:
-                cost=self.total_cost(evaluationData,lmda)
+                cost = self.total_cost(evaluationData, lmda)
                 evaluation_cost.append(cost)
                 print("Cost on evaluation data: {}".format(cost))
             if monitor_training_cost:
-                cost=self.total_cost(training_data,lmda)
+                cost = self.total_cost(training_data, lmda)
                 training_cost.append(cost)
                 print("Cost on training data: {}".format(cost))
             if monitor_evaluation_accuracy and evaluationData:
-                correct=self.evaluate(evaluationData)
-                acc=correct/(n_test*1.0)
-                acc*=100
+                correct = self.evaluate(evaluationData)
+                acc = correct/(n_test*1.0)
+                acc *= 100
                 evaluation_accuracy.append(acc)
-                print("Accuracy on evaluation data: {0} / {1} ({2}%)".format(correct, n_test,acc))
+                print(
+                    "Accuracy on evaluation data: {0} / {1} ({2}%)".format(correct, n_test, acc))
             if monitor_training_accuracy:
-                correct=self.evaluate(training_data)
-                acc=correct/(n*1.0)
-                acc*=100
+                correct = self.evaluate(training_data)
+                acc = correct/(n*1.0)
+                acc *= 100
                 training_accuracy.append(acc)
-                print("Accuracy on training data: {0} / {1} ({2}%)".format(correct, n,acc))
+                print(
+                    "Accuracy on training data: {0} / {1} ({2}%)".format(correct, n, acc))
             end_time = time.time()
             elapsed_time = end_time - start_time
-            
-            print("Epoch Elapsed time: {0} seconds\nPreprocessing time: {1} seconds\n".format(elapsed_time,self.preprocessing))
+
+            print("Epoch Elapsed time: {0} seconds\nPreprocessing time: {1} seconds\n".format(
+                elapsed_time, self.preprocessing))
             print("Epoch {0} complete\n".format(j))
-            self.preprocessing=0
+            self.preprocessing = 0
             # np.save("data/save/weights.npy", self.weights)
             # np.save("data/save/biases.npy", self.biases)
             self.save("data/save/model.json")
-        
-        plt.subplot(1,2,1)
-        plt.plot(range(epochs),training_cost)
-        plt.plot(range(epochs),evaluation_cost)
-        plt.legend(["training cost","evaluation cost"])
+
+        plt.subplot(1, 2, 1)
+        plt.plot(range(epochs), training_cost)
+        plt.plot(range(epochs), evaluation_cost)
+        plt.legend(["training cost", "evaluation cost"])
         plt.title("cost function curve")
         plt.xlabel("epoch")
         plt.ylabel("cost")
-        
-        plt.subplot(1,2,2)
-        plt.plot(range(epochs),training_accuracy)
-        plt.plot(range(epochs),evaluation_accuracy)
-        plt.legend(["training accuracy","evaluation accuracy"])
+
+        plt.subplot(1, 2, 2)
+        plt.plot(range(epochs), training_accuracy)
+        plt.plot(range(epochs), evaluation_accuracy)
+        plt.legend(["training accuracy", "evaluation accuracy"])
         plt.title("accuracy function curve")
         plt.xlabel("epoch")
         plt.ylabel("accuracy curve")
         plt.show()
 
-    def update_mini_batch(self, mini_batch, eta,n=1,lmda=0.0):
+    def update_mini_batch(self, mini_batch, eta, n=1, lmda=0.0):
         """Update the network's weights and biases by applying
         gradient descent using backpropagation to a single mini batch.
         The ``mini_batch`` is a list of tuples ``(x, y)``, and ``eta``
@@ -149,7 +157,7 @@ class Network(object):
         #     delta_nabla_b, delta_nabla_w = self.backprop(x, y)
         #     nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
         #     nabla_w = [nw+dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
-        nabla_b,nabla_w=self.my_backprop(mini_batch)
+        nabla_b, nabla_w = self.my_backprop(mini_batch)
         self.weights = [(1.0-(eta*lmda)/n)*w-(eta/len(mini_batch))*nw
                         for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b-(eta/len(mini_batch))*nb
@@ -189,8 +197,8 @@ class Network(object):
             nabla_b[-l] = delta
             nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
         return (nabla_b, nabla_w)
-    
-    def my_backprop(self,mini_batch):
+
+    def my_backprop(self, mini_batch):
         """Return a tuple ``(nabla_b, nabla_w)`` representing the
         gradient for the cost function C_x.  ``nabla_b`` and
         ``nabla_w`` are layer-by-layer lists of numpy arrays, similar
@@ -198,23 +206,23 @@ class Network(object):
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
         start_time = time.time()
-        x=[item[0] for item in mini_batch]
-        y=[item[1] for item in mini_batch]
+        x = [item[0] for item in mini_batch]
+        y = [item[1] for item in mini_batch]
         # for i in range(len(x)):
         #     x[i]=x[i].tolist()
         #     x[i]=[item[0] for item in x[i]]
         for i in range(len(y)):
-            y[i]=[item[0] for item in y[i]]
+            y[i] = [item[0] for item in y[i]]
         end_time = time.time()
         elapsed_time = end_time - start_time
-        self.preprocessing+=elapsed_time
-        x=np.array(x)
-        y=np.array(y)
-        x=x.transpose()
-        y=y.transpose()
-        
+        self.preprocessing += elapsed_time
+        x = np.array(x)
+        y = np.array(y)
+        x = x.transpose()
+        y = y.transpose()
+
         # print("mini-batch preprocessing time Elapsed time: {0} seconds".format(elapsed_time))
-        
+
         # feedforward
         activation = x
         activations = [x]  # list to store all the activations, layer by layer
@@ -225,8 +233,8 @@ class Network(object):
             activation = sigmoid(z)
             activations.append(activation)
         # backward pass
-        delta = crossEntropy.crossEntropy.delta(zs[-1],activations[-1],y)
-        nabla_b[-1] = delta.sum(axis=1,keepdims=True)
+        delta = crossEntropy.crossEntropy.delta(zs[-1], activations[-1], y)
+        nabla_b[-1] = delta.sum(axis=1, keepdims=True)
         nabla_w[-1] = np.dot(delta, activations[-2].transpose())
         # Note that the variable l in the loop below is used a little
         # differently to the notation in Chapter 2 of the book.  Here,
@@ -238,7 +246,7 @@ class Network(object):
             z = zs[-l]
             sp = sigmoid_prime(z)
             delta = np.dot(self.weights[-l+1].transpose(), delta) * sp
-            nabla_b[-l] = delta.sum(axis=1,keepdims=True)
+            nabla_b[-l] = delta.sum(axis=1, keepdims=True)
             nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
         return (nabla_b, nabla_w)
 
@@ -259,20 +267,20 @@ class Network(object):
         """Return the vector of partial derivatives \partial C_x /
         \partial a for the output activations."""
         return (output_activations-y)
-    
-    def total_cost(self,target_data,lmda=0.0):
-        ret=0.0
-        for x,y in target_data:
-            a=self.feedforward(x)
+
+    def total_cost(self, target_data, lmda=0.0):
+        ret = 0.0
+        for x, y in target_data:
+            a = self.feedforward(x)
             try:
-                ret+=(crossEntropy.crossEntropy.fn(a,y)/len(target_data))
+                ret += (crossEntropy.crossEntropy.fn(a, y)/len(target_data))
             except TypeError:
-                y=vectorized_result(y)
-                ret+=crossEntropy.crossEntropy.fn(a,y)/len(target_data)
+                y = vectorized_result(y)
+                ret += crossEntropy.crossEntropy.fn(a, y)/len(target_data)
         ret += 0.5*(lmda/len(target_data))*sum(
             np.linalg.norm(w)**2 for w in self.weights)
         return ret
-    
+
     def save(self, filename):
         """Save the neural network to the file ``filename``."""
         data = {"sizes": self.sizes,
@@ -295,7 +303,9 @@ def sigmoid_prime(z):
     """Derivative of the sigmoid function."""
     return sigmoid(z)*(1-sigmoid(z))
 
-#### Loading a Network
+# Loading a Network
+
+
 def load(filename):
     """Load a neural network from the file ``filename``.  Returns an
     instance of Network.
