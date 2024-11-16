@@ -12,12 +12,13 @@ and omits many desirable features.
 # Libraries
 # Standard library
 import random
-
+import sys
 # Third-party libraries
 import numpy as np
 import time
 import crossEntropy
 import matplotlib.pyplot as plt
+import json
 
 #### Miscellaneous functions
 def vectorized_result(j):
@@ -32,7 +33,7 @@ def vectorized_result(j):
 
 class Network(object):
 
-    def __init__(self, sizes=None,saves=None):
+    def __init__(self, sizes):
         """The list ``sizes`` contains the number of neurons in the
         respective layers of the network.  For example, if the list
         was [2, 3, 1] then it would be a three-layer network, with the
@@ -45,19 +46,8 @@ class Network(object):
         ever used in computing the outputs from later layers."""
         self.sizes = sizes
         self.preprocessing=0
-        try:
-            if saves:
-                tmp1 = np.load(saves[0],allow_pickle=True)
-                tmp2 = np.load(saves[1],allow_pickle=True)
-                self.weights = tmp1
-                self.biases = tmp2
-                self.num_layers=len(self.biases)+1
-            else:
-                raise OSError
-        except OSError:
-            print("save not exist!")
-            self.num_layers = len(sizes)
-            self.weight_initializer()
+        self.num_layers = len(sizes)
+        self.weight_initializer()
             
     def weight_initializer(self):
         self.biases = [np.random.randn(y, 1) for y in self.sizes[1:]]
@@ -127,8 +117,9 @@ class Network(object):
             print("Epoch Elapsed time: {0} seconds\nPreprocessing time: {1} seconds\n".format(elapsed_time,self.preprocessing))
             print("Epoch {0} complete\n".format(j))
             self.preprocessing=0
-            np.save("data/save/weights.npy", self.weights)
-            np.save("data/save/biases.npy", self.biases)
+            # np.save("data/save/weights.npy", self.weights)
+            # np.save("data/save/biases.npy", self.biases)
+            self.save("data/save/model.json")
         
         plt.subplot(1,2,1)
         plt.plot(range(epochs),training_cost)
@@ -281,6 +272,16 @@ class Network(object):
         ret += 0.5*(lmda/len(target_data))*sum(
             np.linalg.norm(w)**2 for w in self.weights)
         return ret
+    
+    def save(self, filename):
+        """Save the neural network to the file ``filename``."""
+        data = {"sizes": self.sizes,
+                "weights": [w.tolist() for w in self.weights],
+                "biases": [b.tolist() for b in self.biases]}
+        f = open(filename, "w")
+        json.dump(data, f)
+        f.close()
+        print("save successful!\n")
 
 # Miscellaneous functions
 
@@ -293,3 +294,18 @@ def sigmoid(z):
 def sigmoid_prime(z):
     """Derivative of the sigmoid function."""
     return sigmoid(z)*(1-sigmoid(z))
+
+#### Loading a Network
+def load(filename):
+    """Load a neural network from the file ``filename``.  Returns an
+    instance of Network.
+
+    """
+    f = open(filename, "r")
+    data = json.load(f)
+    f.close()
+    net = Network(data["sizes"])
+    net.weights = [np.array(w) for w in data["weights"]]
+    net.biases = [np.array(b) for b in data["biases"]]
+    print("load successful!\n")
+    return net
