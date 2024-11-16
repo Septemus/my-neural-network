@@ -51,6 +51,7 @@ class Network(object):
         self.preprocessing = 0
         self.num_layers = len(sizes)
         self.weight_initializer()
+        self.velocity = [np.zeros(w.shape) for w in self.weights]
 
     def weight_initializer(self):
         self.biases = [np.random.randn(y, 1) for y in self.sizes[1:]]
@@ -66,6 +67,7 @@ class Network(object):
 
     def SGD(self, training_data, epochs, mini_batch_size, eta,
             lmda=0.0,
+            momentum_coefficient=0.0,
             evaluationData=None, monitor_evaluation_cost=True, monitor_training_cost=True, monitor_evaluation_accuracy=True, monitor_training_accuracy=True):
         """Train the neural network using mini-batch stochastic
         gradient descent.  The ``training_data`` is a list of tuples
@@ -95,7 +97,8 @@ class Network(object):
             # plt.title(mini_batches[15][8][1])
             # plt.show()
             for mini_batch in mini_batches:
-                self.update_mini_batch(mini_batch, eta, n, lmda)
+                self.update_mini_batch(
+                    mini_batch, eta, n, lmda, momentum_coefficient)
             if monitor_evaluation_cost and evaluationData:
                 cost = self.total_cost(evaluationData, lmda)
                 evaluation_cost.append(cost)
@@ -146,7 +149,7 @@ class Network(object):
         plt.ylabel("accuracy curve")
         plt.show()
 
-    def update_mini_batch(self, mini_batch, eta, n=1, lmda=0.0):
+    def update_mini_batch(self, mini_batch, eta, n=1, lmda=0.0, momentum_coefficient=0.0):
         """Update the network's weights and biases by applying
         gradient descent using backpropagation to a single mini batch.
         The ``mini_batch`` is a list of tuples ``(x, y)``, and ``eta``
@@ -158,8 +161,10 @@ class Network(object):
         #     nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
         #     nabla_w = [nw+dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
         nabla_b, nabla_w = self.my_backprop(mini_batch)
-        self.weights = [(1.0-(eta*lmda)/n)*w-(eta/len(mini_batch))*nw
-                        for w, nw in zip(self.weights, nabla_w)]
+        self.velocity = [momentum_coefficient*v-(eta/len(mini_batch))*nw
+                         for v, nw in zip(self.velocity, nabla_w)]
+        self.weights = [(1.0-(eta*lmda)/n)*w + v
+                        for w, v in zip(self.weights, self.velocity)]
         self.biases = [b-(eta/len(mini_batch))*nb
                        for b, nb in zip(self.biases, nabla_b)]
 
@@ -285,7 +290,9 @@ class Network(object):
         """Save the neural network to the file ``filename``."""
         data = {"sizes": self.sizes,
                 "weights": [w.tolist() for w in self.weights],
-                "biases": [b.tolist() for b in self.biases]}
+                "biases": [b.tolist() for b in self.biases],
+                "velocity": [v.tolist() for v in self.velocity]
+                }
         f = open(filename, "w")
         json.dump(data, f)
         f.close()
@@ -317,5 +324,6 @@ def load(filename):
     net = Network(data["sizes"])
     net.weights = [np.array(w) for w in data["weights"]]
     net.biases = [np.array(b) for b in data["biases"]]
+    net.velocity = [np.array(v) for v in data["velocity"]]
     print("load successful!\n")
     return net
