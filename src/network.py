@@ -56,10 +56,12 @@ class Network(object):
                 raise OSError
         except OSError:
             print("save not exist!")
-            self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
-            self.weights = [np.random.randn(y, x)
-                            for x, y in zip(sizes[:-1], sizes[1:])]
             self.num_layers = len(sizes)
+            self.weight_initializer()
+            
+    def weight_initializer(self):
+        self.biases = [np.random.randn(y, 1) for y in self.sizes[1:]]
+        self.weights = [np.random.randn(y, x)/np.sqrt(x) for x, y in zip(self.sizes[:-1], self.sizes[1:])]
 
     def feedforward(self, a):
         """Return the output of the network if ``a`` is input."""
@@ -98,7 +100,7 @@ class Network(object):
             # plt.title(mini_batches[15][8][1])
             # plt.show()
             for mini_batch in mini_batches:
-                self.update_mini_batch(mini_batch, eta)
+                self.update_mini_batch(mini_batch, eta,n,lmda)
             if monitor_evaluation_cost and evaluationData:
                 cost=self.total_cost(evaluationData,lmda)
                 evaluation_cost.append(cost)
@@ -142,10 +144,10 @@ class Network(object):
         plt.legend(["training accuracy","evaluation accuracy"])
         plt.title("accuracy function curve")
         plt.xlabel("epoch")
-        plt.ylabel("accuracy")
+        plt.ylabel("accuracy curve")
         plt.show()
 
-    def update_mini_batch(self, mini_batch, eta):
+    def update_mini_batch(self, mini_batch, eta,n=1,lmda=0.0):
         """Update the network's weights and biases by applying
         gradient descent using backpropagation to a single mini batch.
         The ``mini_batch`` is a list of tuples ``(x, y)``, and ``eta``
@@ -157,7 +159,7 @@ class Network(object):
         #     nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
         #     nabla_w = [nw+dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
         nabla_b,nabla_w=self.my_backprop(mini_batch)
-        self.weights = [w-(eta/len(mini_batch))*nw
+        self.weights = [(1.0-(eta*lmda)/n)*w-(eta/len(mini_batch))*nw
                         for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b-(eta/len(mini_batch))*nb
                        for b, nb in zip(self.biases, nabla_b)]
