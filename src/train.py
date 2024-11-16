@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.io import loadmat
 import time
+import crossEntropy
 
 if __name__=="__main__":
     data = loadmat('data/mnist-original.mat')['data'].transpose()/255.0
@@ -17,9 +18,11 @@ if __name__=="__main__":
         
     # my_testdata=data[60000:]
     
-    training_data , validation_data , test_data = mnist_loader.load_data_wrapper()
-    net = network.Network(saves=("data/save/weights.npy","data/save/biases.npy"))
-    all_data=training_data+data[:60000]
+    # training_data , validation_data , test_data = mnist_loader.load_data_wrapper()
+    net = network.Network(sizes=(784,50,10),cost=crossEntropy.crossEntropy)
+    # net=network.load("data/save/model.json")
+    # all_data=training_data+data[:60000]
+    all_data=data
     # all_testdata=test_data+my_testdata
-    net.SGD(all_data , 300, 60, 0.01, test_data=test_data)
+    net.SGD(all_data[:60000] , 120, 100, 0.7, evaluationData=data[60000:],lmda=0.5,momentum_coefficient=0.5)
     

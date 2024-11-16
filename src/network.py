@@ -36,7 +36,7 @@ def vectorized_result(j):
 
 class Network(object):
 
-    def __init__(self, sizes):
+    def __init__(self, sizes,cost):
         """The list ``sizes`` contains the number of neurons in the
         respective layers of the network.  For example, if the list
         was [2, 3, 1] then it would be a three-layer network, with the
@@ -47,6 +47,7 @@ class Network(object):
         layer is assumed to be an input layer, and by convention we
         won't set any biases for those neurons, since biases are only
         ever used in computing the outputs from later layers."""
+        self.cost=cost
         self.sizes = sizes
         self.preprocessing = 0
         self.num_layers = len(sizes)
@@ -244,7 +245,7 @@ class Network(object):
             activation = sigmoid(z)
             activations.append(activation)
         # backward pass
-        delta = crossEntropy.crossEntropy.delta(zs[-1], activations[-1], y)
+        delta = self.cost.delta(zs[-1], activations[-1], y)
         nabla_b[-1] = delta.sum(axis=1, keepdims=True)
         nabla_w[-1] = np.dot(delta, activations[-2].transpose())
         # Note that the variable l in the loop below is used a little
@@ -284,10 +285,10 @@ class Network(object):
         for x, y in target_data:
             a = self.feedforward(x)
             try:
-                ret += (crossEntropy.crossEntropy.fn(a, y)/len(target_data))
+                ret += (self.cost.fn(a, y)/len(target_data))
             except TypeError:
                 y = vectorized_result(y)
-                ret += crossEntropy.crossEntropy.fn(a, y)/len(target_data)
+                ret += self.cost.fn(a, y)/len(target_data)
         ret += 0.5*(lmda/len(target_data))*sum(
             np.linalg.norm(w)**2 for w in self.weights)
         return ret
