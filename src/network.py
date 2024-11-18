@@ -23,13 +23,13 @@ import json
 # Miscellaneous functions
 
 
-def vectorized_result(j):
+def vectorized_result(j,dimension=10):
     """Return a 10-dimensional unit vector with a 1.0 in the j'th position
     and zeroes elsewhere.  This is used to convert a digit (0...9)
     into a corresponding desired output from the neural network.
 
     """
-    e = np.zeros((10, 1))
+    e = np.zeros((dimension, 1))
     e[j] = 1.0
     return e
 
@@ -140,16 +140,16 @@ class Network(object):
                     
 
         plt.subplot(1, 2, 1)
-        plt.plot(range(epochs), training_cost)
-        plt.plot(range(epochs), evaluation_cost)
+        plt.plot(range(epochs), training_cost,color='blue',marker='o')
+        plt.plot(range(epochs), evaluation_cost,color='red',marker='+')
         plt.legend(["training cost", "evaluation cost"])
         plt.title("cost function curve")
         plt.xlabel("epoch")
         plt.ylabel("cost")
 
         plt.subplot(1, 2, 2)
-        plt.plot(range(epochs), training_accuracy)
-        plt.plot(range(epochs), evaluation_accuracy)
+        plt.plot(range(epochs), training_accuracy,color='blue',marker='o')
+        plt.plot(range(epochs), evaluation_accuracy,color='red',marker='+')
         plt.legend(["training accuracy", "evaluation accuracy"])
         plt.title("accuracy function curve")
         plt.xlabel("epoch")
@@ -287,7 +287,7 @@ class Network(object):
             try:
                 ret += (self.cost.fn(a, y)/len(target_data))
             except TypeError:
-                y = vectorized_result(y)
+                y = vectorized_result(y,self.sizes[-1])
                 ret += self.cost.fn(a, y)/len(target_data)
         ret += 0.5*(lmda/len(target_data))*sum(
             np.linalg.norm(w)**2 for w in self.weights)
