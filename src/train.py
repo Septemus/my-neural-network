@@ -6,6 +6,7 @@ from scipy.io import loadmat
 import time
 import pandas as pd
 import crossEntropy
+import softmax
 from sklearn.preprocessing import MinMaxScaler
 
 def my_transform(mydata):
@@ -40,10 +41,10 @@ if __name__=="__main__":
     my_test_data=pd.read_csv("data/real_test.csv")
     x=my_transform(mydata)
     test=my_transform(my_test_data)
-    net = network.Network(sizes=(7,150,15),cost=crossEntropy.crossEntropy)
+    net = network.Network(sizes=(7,150,15),cost=softmax.softmax)
     # net=network.load("data/save/model.json")
     # all_data=training_data+data[:60000]
     # all_data=data
     # all_testdata=test_data+my_testdata
-    net.SGD(x , 45, 1000, 0.3, evaluationData=test,lmda=5,momentum_coefficient=0.5)
+    net.SGD(x , 45, 1000, 0.3, evaluationData=test,lmda=500,momentum_coefficient=0.5)
     

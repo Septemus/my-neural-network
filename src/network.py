@@ -61,9 +61,15 @@ class Network(object):
 
     def feedforward(self, a):
         """Return the output of the network if ``a`` is input."""
+        count=0
         a = a.reshape(len(a), 1)
         for b, w in zip(self.biases, self.weights):
-            a = sigmoid(np.dot(w, a)+b)
+            count+=1
+            z=np.dot(w, a)+b
+            if self.cost.method=="softmax" and count==self.num_layers-1:
+                a=self.cost.output(z)
+            else:
+                a = sigmoid(z)
         return a
 
     def SGD(self, training_data, epochs, mini_batch_size, eta,
@@ -102,7 +108,7 @@ class Network(object):
                 self.update_mini_batch(
                     mini_batch, eta, n, lmda, momentum_coefficient)
             if monitor_evaluation_cost and evaluationData:
-                cost = self.total_cost(evaluationData, lmda)
+                cost = self.total_cost(evaluationData, (lmda*len(evaluationData))/len(training_data))
                 evaluation_cost.append(cost)
                 print("Cost on evaluation data: {}".format(cost))
             if monitor_training_cost:
@@ -175,40 +181,40 @@ class Network(object):
         self.biases = [b-(eta/len(mini_batch))*nb
                        for b, nb in zip(self.biases, nabla_b)]
 
-    def backprop(self, x, y):
-        """Return a tuple ``(nabla_b, nabla_w)`` representing the
-        gradient for the cost function C_x.  ``nabla_b`` and
-        ``nabla_w`` are layer-by-layer lists of numpy arrays, similar
-        to ``self.biases`` and ``self.weights``."""
-        nabla_b = [np.zeros(b.shape) for b in self.biases]
-        nabla_w = [np.zeros(w.shape) for w in self.weights]
-        # feedforward
-        activation = x
-        activations = [x]  # list to store all the activations, layer by layer
-        zs = []  # list to store all the z vectors, layer by layer
-        for b, w in zip(self.biases, self.weights):
-            z = np.dot(w, activation)+b
-            zs.append(z)
-            activation = sigmoid(z)
-            activations.append(activation)
-        # backward pass
-        delta = self.cost_derivative(activations[-1], y) * \
-            sigmoid_prime(zs[-1])
-        nabla_b[-1] = delta
-        nabla_w[-1] = np.dot(delta, activations[-2].transpose())
-        # Note that the variable l in the loop below is used a little
-        # differently to the notation in Chapter 2 of the book.  Here,
-        # l = 1 means the last layer of neurons, l = 2 is the
-        # second-last layer, and so on.  It's a renumbering of the
-        # scheme in the book, used here to take advantage of the fact
-        # that Python can use negative indices in lists.
-        for l in range(2, self.num_layers):
-            z = zs[-l]
-            sp = sigmoid_prime(z)
-            delta = np.dot(self.weights[-l+1].transpose(), delta) * sp
-            nabla_b[-l] = delta
-            nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
-        return (nabla_b, nabla_w)
+    # def backprop(self, x, y):
+    #     """Return a tuple ``(nabla_b, nabla_w)`` representing the
+    #     gradient for the cost function C_x.  ``nabla_b`` and
+    #     ``nabla_w`` are layer-by-layer lists of numpy arrays, similar
+    #     to ``self.biases`` and ``self.weights``."""
+    #     nabla_b = [np.zeros(b.shape) for b in self.biases]
+    #     nabla_w = [np.zeros(w.shape) for w in self.weights]
+    #     # feedforward
+    #     activation = x
+    #     activations = [x]  # list to store all the activations, layer by layer
+    #     zs = []  # list to store all the z vectors, layer by layer
+    #     for b, w in zip(self.biases, self.weights):
+    #         z = np.dot(w, activation)+b
+    #         zs.append(z)
+    #         activation = sigmoid(z)
+    #         activations.append(activation)
+    #     # backward pass
+    #     delta = self.cost_derivative(activations[-1], y) * \
+    #         sigmoid_prime(zs[-1])
+    #     nabla_b[-1] = delta
+    #     nabla_w[-1] = np.dot(delta, activations[-2].transpose())
+    #     # Note that the variable l in the loop below is used a little
+    #     # differently to the notation in Chapter 2 of the book.  Here,
+    #     # l = 1 means the last layer of neurons, l = 2 is the
+    #     # second-last layer, and so on.  It's a renumbering of the
+    #     # scheme in the book, used here to take advantage of the fact
+    #     # that Python can use negative indices in lists.
+    #     for l in range(2, self.num_layers):
+    #         z = zs[-l]
+    #         sp = sigmoid_prime(z)
+    #         delta = np.dot(self.weights[-l+1].transpose(), delta) * sp
+    #         nabla_b[-l] = delta
+    #         nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
+    #     return (nabla_b, nabla_w)
 
     def my_backprop(self, mini_batch):
         """Return a tuple ``(nabla_b, nabla_w)`` representing the
@@ -245,6 +251,8 @@ class Network(object):
             activation = sigmoid(z)
             activations.append(activation)
         # backward pass
+        if self.cost.method=="softmax":
+            activations[-1]=self.cost.output(zs[-1])
         delta = self.cost.delta(zs[-1], activations[-1], y)
         nabla_b[-1] = delta.sum(axis=1, keepdims=True)
         nabla_w[-1] = np.dot(delta, activations[-2].transpose())
