@@ -16,7 +16,7 @@ import sys
 # Third-party libraries
 import numpy as np
 import time
-import crossEntropy
+import cost_functions.crossEntropy as crossEntropy
 import matplotlib.pyplot as plt
 import json
 
