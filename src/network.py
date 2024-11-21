@@ -16,12 +16,44 @@ import sys
 # Third-party libraries
 import numpy as np
 import time
-import cost_functions.crossEntropy as crossEntropy
 import matplotlib.pyplot as plt
 import json
 
 # Miscellaneous functions
+class quadratic(object):
+    @staticmethod
+    def fn(a,y):
+        return 0.5*(np.linalg.norm(a-y)**2)
+    
+    @staticmethod
+    def delta(z,a,y):
+        return (a-y)*sigmoid.sigmoid_prime(z)
 
+class softmax(object):
+    @staticmethod
+    def fn(a,y):
+        tmp=np.argmax(y)
+        return -np.sum(np.nan_to_num(np.log(a[tmp])))
+    
+    @staticmethod
+    def delta(z,a,y):
+        return a-y
+    
+    @staticmethod
+    def output(z_last):
+        z_exp=np.exp(z_last)
+        sum=np.sum(z_exp,axis=0)
+        return z_exp*(1./sum)
+
+
+class crossEntropy(object):
+    @staticmethod
+    def fn(a,y):
+        return -np.sum(np.nan_to_num(y*(np.log(a))+(1-y)*np.log(1-a)))
+    
+    @staticmethod
+    def delta(z,a,y):
+        return a-y
 
 def vectorized_result(j,dimension=10):
     """Return a 10-dimensional unit vector with a 1.0 in the j'th position
@@ -66,7 +98,7 @@ class Network(object):
         for b, w in zip(self.biases, self.weights):
             count+=1
             z=np.dot(w, a)+b
-            if self.cost.method=="softmax" and count==self.num_layers-1:
+            if self.cost.__name__=="softmax" and count==self.num_layers-1:
                 a=self.cost.output(z)
             else:
                 a = sigmoid(z)
@@ -139,10 +171,10 @@ class Network(object):
             # np.save("data/save/weights.npy", self.weights)
             # np.save("data/save/biases.npy", self.biases)
             self.save("data/save/model.json")
-            if(monitor_evaluation_accuracy and evaluation_accuracy and j>5):
-                if(evaluation_accuracy[j]<evaluation_accuracy[j-5] and eta_decay_count<10):
-                    eta/=2.0
-                    eta_decay_count+=1
+            # if(monitor_evaluation_accuracy and evaluation_accuracy and j>5):
+            #     if(evaluation_accuracy[j]<evaluation_accuracy[j-5] and eta_decay_count<10):
+            #         eta/=2.0
+            #         eta_decay_count+=1
                     
 
         plt.subplot(1, 2, 1)
@@ -251,7 +283,7 @@ class Network(object):
             activation = sigmoid(z)
             activations.append(activation)
         # backward pass
-        if self.cost.method=="softmax":
+        if self.cost.__name__=="softmax":
             activations[-1]=self.cost.output(zs[-1])
         delta = self.cost.delta(zs[-1], activations[-1], y)
         nabla_b[-1] = delta.sum(axis=1, keepdims=True)
@@ -306,7 +338,8 @@ class Network(object):
         data = {"sizes": self.sizes,
                 "weights": [w.tolist() for w in self.weights],
                 "biases": [b.tolist() for b in self.biases],
-                "velocity": [v.tolist() for v in self.velocity]
+                "velocity": [v.tolist() for v in self.velocity],
+                "cost": str(self.cost.__name__)
                 }
         f = open(filename, "w")
         json.dump(data, f)
@@ -336,7 +369,8 @@ def load(filename):
     f = open(filename, "r")
     data = json.load(f)
     f.close()
-    net = Network(data["sizes"])
+    cost = getattr(sys.modules[__name__], data["cost"])
+    net = Network(data["sizes"],cost)
     net.weights = [np.array(w) for w in data["weights"]]
     net.biases = [np.array(b) for b in data["biases"]]
     net.velocity = [np.array(v) for v in data["velocity"]]
