@@ -122,6 +122,20 @@ class FullyConnectedLayer(object):
         return T.mean(T.eq(y, self.y_out))
 
 
+class CrossEntropyLayer(FullyConnectedLayer):
+    def cost(self,net):
+        "Return the cross-entropy cost."
+        ce_y=T.zeros(self.output_dropout.shape)
+        ce_y=T.set_subtensor(ce_y[T.arange(net.y.shape[0]),net.y],1)
+        ret=-T.mean(
+            T.sum(
+                ce_y*T.log(self.output_dropout)+
+                (1-ce_y)*T.log(1-self.output_dropout),
+                axis=1
+            )
+        )
+        return ret 
+
 
 class Network(object):
 
