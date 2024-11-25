@@ -9,7 +9,7 @@ import theano.tensor as T
 import theano
 import gzip
 import pickle as cPickle
-from theano.tensor.nnet import sigmoid
+from theano.tensor.nnet import sigmoid,relu
 from theano.tensor import shared_randomstreams
 from theano.tensor.nnet import softmax
 from theano.tensor.nnet import conv
@@ -173,6 +173,13 @@ class ConvPoolLayer(object):
 
 class Network(object):
 
+    @staticmethod
+    def load_model(path):
+        f = open(path, 'rb')
+        model=cPickle.load(f)
+        f.close()
+        return model
+    
     def __init__(self, hidden_layers,output_layer):
         self.hidden_layers=hidden_layers
         self.output_layer=output_layer
@@ -182,8 +189,15 @@ class Network(object):
         self.biases=[layer.params[1] for layer in self.layers]
         self.x = T.matrix("x")
         self.y = T.ivector("y")
+        
+    def save_model(self,save_path='data/save/network3.save'):
+        f = open(save_path, 'wb')
+        cPickle.dump(self, f, protocol=cPickle.HIGHEST_PROTOCOL)
+        f.close()
+
 
     def SGD(self, training_data,validation_data,test_data, epochs, mini_batch_size, eta,lmda=0.0,momentum=0.0):
+        self.mini_batch_size=mini_batch_size
         training_x, training_y = training_data
         validation_x, validation_y = validation_data
         test_x, test_y = test_data
@@ -308,6 +322,10 @@ class Network(object):
                     acc_test=test_accuracy_mb(minibatch_index)
                     tmp[1][2].append(acc_test)
             
+            if(len(test_accuracies)==0 or np.max(test_accuracies)<np.mean(tmp[1][2])):
+                self.save_model()
+                print("model is best by far.saving it...")
+            
             training_costs.append(np.mean(tmp[0][0]))
             validation_costs.append(np.mean(tmp[0][1]))
             test_costs.append(np.mean(tmp[0][2]))
@@ -351,3 +369,24 @@ class Network(object):
         plt.ylabel("accuracy curve")
         plt.show()
 
+    def predict(self,target_x):
+        target_x=np.broadcast_to(target_x,(self.mini_batch_size,target_x.shape[0]))
+        predict_mb=theano.function([],self.output_layer.y_out,givens={
+            self.x:target_x
+        })
+        ret=predict_mb()
+        return ret[0]
+    def accuracy(self,target_data):
+        target_x,target_y=target_data
+        i = T.lscalar() # mini-batch index
+        target_accuracy_mb = theano.function(
+            [i], self.output_layer.accuracy(self.y),
+            givens={
+                self.x:
+                target_x[i*self.mini_batch_size: (i+1)*self.mini_batch_size],
+                self.y:
+                target_y[i*self.mini_batch_size: (i+1)*self.mini_batch_size]
+            }
+        )
+        num_batches=size(target_data)/self.mini_batch_size
+        return np.mean([target_accuracy_mb(j) for j in range(num_batches)])
