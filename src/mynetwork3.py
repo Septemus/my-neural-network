@@ -255,9 +255,9 @@ class Network(object):
             
             
             
-            print("accuracy on training data: {}".format(acc_train))
-            print("accuracy on validation data: {}".format(acc_val))
-            print("accuracy on test data: {}".format(acc_test))
+            print("accuracy on training data: {0:.2%}".format(acc_train))
+            print("accuracy on validation data: {0:.2%}".format(acc_val))
+            print("accuracy on test data: {0:.2%}".format(acc_test))
             
             
             print("Cost on training data: {}".format(cost_train))
