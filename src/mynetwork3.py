@@ -12,6 +12,9 @@ import pickle as cPickle
 from theano.tensor.nnet import sigmoid
 from theano.tensor import shared_randomstreams
 from theano.tensor.nnet import softmax
+from theano.tensor.nnet import conv
+from theano.tensor.signal import downsample
+
 #### Constants
 GPU = True
 if GPU:
@@ -78,12 +81,12 @@ class FullyConnectedLayer(object):
         self.params = [self.w, self.b]
 
     def set_inpt(self, inpt, inpt_dropout):
-        self.inpt = inpt
+        self.inpt = inpt.reshape((inpt.shape[0], self.n_in))
         self.output = self.activation_fn(
             (1-self.p_dropout)*T.dot(self.inpt, self.w) + self.b)
         self.y_out = T.argmax(self.output, axis=1)
         self.inpt_dropout = dropout_layer(
-            inpt_dropout, self.p_dropout)
+            inpt_dropout.reshape((inpt_dropout.shape[0], self.n_in)), self.p_dropout)
         self.output_dropout = self.activation_fn(
             T.dot(self.inpt_dropout, self.w) + self.b)
 
@@ -128,6 +131,46 @@ class SoftmaxLayer(FullyConnectedLayer):
         return -T.mean(T.log(self.output_dropout)[T.arange(net.y.shape[0]), net.y])
 
 
+#### Define layer types
+
+class ConvPoolLayer(object):
+    """Used to create a combination of a convolutional and a max-pooling
+    layer.  A more sophisticated implementation would separate the
+    two, but for our purposes we'll always use them together, and it
+    simplifies the code, so it makes sense to combine them.
+
+    """
+
+    def __init__(self, filter_shape, image_shape, poolsize=(2, 2),activation_fn=sigmoid):
+        self.filter_shape = filter_shape
+        self.image_shape = image_shape
+        self.poolsize = poolsize
+        self.activation_fn=activation_fn
+        # initialize weights and biases
+        n_out = (filter_shape[0]*np.prod(filter_shape[2:])/np.prod(poolsize))
+        self.w = theano.shared(
+            np.asarray(
+                np.random.normal(loc=0, scale=np.sqrt(1.0/n_out), size=filter_shape),
+                dtype=theano.config.floatX),
+            borrow=True)
+        self.b = theano.shared(
+            np.asarray(
+                np.random.normal(loc=0, scale=1.0, size=(filter_shape[0],)),
+                dtype=theano.config.floatX),
+            borrow=True)
+        self.params = [self.w, self.b]
+
+    def set_inpt(self, inpt, inpt_dropout):
+        self.inpt = inpt.reshape(self.image_shape)
+        conv_out = conv.conv2d(
+            input=self.inpt, filters=self.w, filter_shape=self.filter_shape,image_shape=self.image_shape)
+        pooled_out = downsample.max_pool_2d(
+            input=conv_out, ds=self.poolsize, ignore_border=True)
+        self.output = self.activation_fn(
+            pooled_out + self.b.dimshuffle('x', 0, 'x', 'x'))
+        self.output_dropout = self.output # no dropout in the convolutional layers
+
+
 class Network(object):
 
     def __init__(self, hidden_layers,output_layer):
@@ -157,14 +200,13 @@ class Network(object):
         
         
         i = T.lscalar() # mini-batch index
-        length=T.iscalar()
         cost = self.output_layer.cost(self)+\
-               0.5*lmda*l2_norm_squared/length
+               0.5*lmda*l2_norm_squared/size(training_data)
         grads = T.grad(cost, self.params)
         updates = [(param, param-eta*grad)
                    for param, grad in zip(self.params, grads)]
         train_mb = theano.function(
-            [i,length], cost, updates=updates,
+            [i], cost, updates=updates,
             givens={
                 self.x:
                 training_x[i*mini_batch_size: (i+1)*mini_batch_size],
@@ -174,86 +216,100 @@ class Network(object):
         )
         
         cost_train_mb = theano.function(
-            [length],cost,givens={
-                self.x:training_x,
-                self.y:training_y
+            [i],cost,givens={
+                self.x:
+                training_x[i*mini_batch_size: (i+1)*mini_batch_size],
+                self.y:
+                training_y[i*mini_batch_size: (i+1)*mini_batch_size]
             }
         )
         cost_validation_mb = theano.function(
-            [length],cost,givens={
-                self.x:validation_x,
-                self.y:validation_y
+            [i],cost,givens={
+                self.x:
+                validation_x[i*mini_batch_size: (i+1)*mini_batch_size],
+                self.y:
+                validation_y[i*mini_batch_size: (i+1)*mini_batch_size]
             }
         )
         cost_test_mb = theano.function(
-            [length],cost,givens={
-                self.x:test_x,
-                self.y:test_y
+            [i],cost,givens={
+                self.x:
+                test_x[i*mini_batch_size: (i+1)*mini_batch_size],
+                self.y:
+                test_y[i*mini_batch_size: (i+1)*mini_batch_size]
             }
         )
         
         train_accuracy_mb = theano.function(
-            [], self.output_layer.accuracy(self.y),
+            [i], self.output_layer.accuracy(self.y),
             givens={
                 self.x:
-                training_x,
+                training_x[i*mini_batch_size: (i+1)*mini_batch_size],
                 self.y:
-                training_y
+                training_y[i*mini_batch_size: (i+1)*mini_batch_size]
             }
         )
         test_accuracy_mb = theano.function(
-            [], self.output_layer.accuracy(self.y),
+            [i], self.output_layer.accuracy(self.y),
             givens={
                 self.x:
-                test_x,
+                test_x[i*mini_batch_size: (i+1)*mini_batch_size],
                 self.y:
-                test_y
+                test_y[i*mini_batch_size: (i+1)*mini_batch_size]
             }
         )
         validation_accuracy_mb = theano.function(
-            [], self.output_layer.accuracy(self.y),
+            [i], self.output_layer.accuracy(self.y),
             givens={
                 self.x:
-                validation_x,
+                validation_x[i*mini_batch_size: (i+1)*mini_batch_size],
                 self.y:
-                validation_y
+                validation_y[i*mini_batch_size: (i+1)*mini_batch_size]
             }
         )
         training_costs, validation_costs,test_costs = [], [],[]
         training_accuracies, validation_accuracies,test_accuracies = [], [],[]
         for epoch in range(epochs):
+            tmp=[[[],[],[]],[[],[],[]]]
             for minibatch_index in range(num_training_batches):
-                train_mb(minibatch_index,size(training_data))
+                train_mb(minibatch_index)
+                cost_train=cost_train_mb(minibatch_index)
+                tmp[0][0].append(cost_train)
+                acc_train=train_accuracy_mb(minibatch_index)
+                tmp[1][0].append(acc_train)
                 
+                if mini_batch_size*minibatch_index<size(validation_data):
+                    cost_val=cost_validation_mb(minibatch_index)
+                    tmp[0][1].append(cost_val)
+                    acc_val=validation_accuracy_mb(minibatch_index)
+                    tmp[1][1].append(acc_val)
+                
+                if mini_batch_size*minibatch_index<size(test_data):
+                    cost_test=cost_test_mb(minibatch_index)
+                    tmp[0][2].append(cost_test)
+                    acc_test=test_accuracy_mb(minibatch_index)
+                    tmp[1][2].append(acc_test)
             
-            cost_train=cost_train_mb(size(training_data))
-            cost_val=cost_validation_mb(size(validation_data))
-            cost_test=cost_test_mb(size(test_data))
+            training_costs.append(np.mean(tmp[0][0]))
+            validation_costs.append(np.mean(tmp[0][1]))
+            test_costs.append(np.mean(tmp[0][2]))
             
-            training_costs.append(cost_train)
-            validation_costs.append(cost_val)
-            test_costs.append(cost_test)
-            
-            acc_train=train_accuracy_mb()
-            acc_val=validation_accuracy_mb()
-            acc_test=test_accuracy_mb()
-            
-            training_accuracies.append(acc_train)
-            validation_accuracies.append(acc_val)
-            test_accuracies.append(acc_test)
+            training_accuracies.append(np.mean(tmp[1][0]))
+            validation_accuracies.append(np.mean(tmp[1][1]))
+            test_accuracies.append(np.mean(tmp[1][2]))
             
             print("This is epoch {}".format(epoch))
             
             
             
-            print("accuracy on training data: {0:.2%}".format(acc_train))
-            print("accuracy on validation data: {0:.2%}".format(acc_val))
-            print("accuracy on test data: {0:.2%}".format(acc_test))
+            print("accuracy on training data: {0:.2%}".format(training_accuracies[-1]))
+            print("accuracy on validation data: {0:.2%}".format(validation_accuracies[-1]))
+            print("accuracy on test data: {0:.2%}".format(test_accuracies[-1]))
             
             
-            print("Cost on training data: {}".format(cost_train))
-            print("Cost on validation data: {}".format(cost_val))
-            print("Cost on test data: {}".format(cost_test))
+            print("Cost on training data: {}".format(training_costs[-1]))
+            print("Cost on validation data: {}".format(validation_costs[-1]))
+            print("Cost on test data: {}".format(test_costs[-1]))
             
             
             print("Epoch {0} complete\n".format(epoch))        
