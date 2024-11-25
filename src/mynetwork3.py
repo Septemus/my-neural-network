@@ -55,36 +55,6 @@ def dropout_layer(layer, p_dropout):
 
 
 
-class SoftmaxLayer(object):
-
-    def __init__(self, n_in, n_out, p_dropout=0.0):
-        self.n_in = n_in
-        self.n_out = n_out
-        self.p_dropout = p_dropout
-        # Initialize weights and biases
-        self.w = theano.shared(
-            np.zeros((n_in, n_out), dtype=theano.config.floatX),
-            name='w', borrow=True)
-        self.b = theano.shared(
-            np.zeros((n_out,), dtype=theano.config.floatX),
-            name='b', borrow=True)
-        self.params = [self.w, self.b]
-
-    def set_inpt(self, inpt, inpt_dropout):
-        self.inpt = inpt
-        self.output = softmax((1-self.p_dropout)*T.dot(self.inpt, self.w) + self.b)
-        self.y_out = T.argmax(self.output, axis=1)
-        self.inpt_dropout = dropout_layer(
-            inpt_dropout, self.p_dropout)
-        self.output_dropout = softmax(T.dot(self.inpt_dropout, self.w) + self.b)
-
-    def cost(self, net):
-        "Return the log-likelihood cost."
-        return -T.mean(T.log(self.output_dropout)[T.arange(net.y.shape[0]), net.y])
-
-    def accuracy(self, y):
-        "Return the accuracy for the mini-batch."
-        return T.mean(T.eq(y, self.y_out))
 
 
 class FullyConnectedLayer(object):
@@ -135,6 +105,27 @@ class CrossEntropyLayer(FullyConnectedLayer):
             )
         )
         return ret 
+
+class SoftmaxLayer(FullyConnectedLayer):
+
+    def __init__(self, n_in, n_out, p_dropout=0.0):
+        self.n_in = n_in
+        self.n_out = n_out
+        self.p_dropout = p_dropout
+        self.activation_fn=softmax
+        # Initialize weights and biases
+        self.w = theano.shared(
+            np.zeros((n_in, n_out), dtype=theano.config.floatX),
+            name='w', borrow=True)
+        self.b = theano.shared(
+            np.zeros((n_out,), dtype=theano.config.floatX),
+            name='b', borrow=True)
+        self.params = [self.w, self.b]
+
+
+    def cost(self, net):
+        "Return the log-likelihood cost."
+        return -T.mean(T.log(self.output_dropout)[T.arange(net.y.shape[0]), net.y])
 
 
 class Network(object):
@@ -265,7 +256,7 @@ class Network(object):
             print("Cost on test data: {}".format(cost_test))
             
             
-            print("Epoch {0} complete\n".format(j))        
+            print("Epoch {0} complete\n".format(epoch))        
 
         plt.subplot(1, 2, 1)
         plt.plot(range(epochs), training_costs,color='blue',marker='o')
