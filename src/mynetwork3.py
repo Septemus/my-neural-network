@@ -178,10 +178,12 @@ class Network(object):
         self.output_layer=output_layer
         self.layers=self.hidden_layers+[self.output_layer]
         self.params = [param for layer in self.layers for param in layer.params]
+        self.weights=[layer.params[0] for layer in self.layers]
+        self.biases=[layer.params[1] for layer in self.layers]
         self.x = T.matrix("x")
         self.y = T.ivector("y")
 
-    def SGD(self, training_data,validation_data,test_data, epochs, mini_batch_size, eta,lmda=0.0):
+    def SGD(self, training_data,validation_data,test_data, epochs, mini_batch_size, eta,lmda=0.0,momentum=0.0):
         training_x, training_y = training_data
         validation_x, validation_y = validation_data
         test_x, test_y = test_data
@@ -202,9 +204,25 @@ class Network(object):
         i = T.lscalar() # mini-batch index
         cost = self.output_layer.cost(self)+\
                0.5*lmda*l2_norm_squared/size(training_data)
-        grads = T.grad(cost, self.params)
-        updates = [(param, param-eta*grad)
-                   for param, grad in zip(self.params, grads)]
+        grads_weights = T.grad(cost, self.weights)
+        grads_biases = T.grad(cost,self.biases)
+        velocities=[
+            theano.shared(
+                np.asarray(
+                    np.zeros(w.get_value(borrow=True).shape),
+                    dtype=theano.config.floatX
+                ),
+                borrow=True
+            ) for w in self.weights
+        ]
+        
+        updates = [
+            (biase, biase-eta*grad) for biase, grad in zip(self.biases, grads_biases)
+        ]+[
+            (v, momentum*v-eta*grad) for v,grad in zip(velocities,grads_weights)
+        ]+[
+            (w,w+v) for w,v in zip(self.weights,velocities)
+        ]
         train_mb = theano.function(
             [i], cost, updates=updates,
             givens={
