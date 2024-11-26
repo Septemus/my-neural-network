@@ -9,3 +9,4 @@ src/ec2
 data/mysample/
 .vscode
 *.pyc
+mnist_expanded.pkl.gz
