@@ -12,15 +12,15 @@ import pickle as cPickle
 from theano.tensor.nnet import sigmoid,relu
 from theano.tensor import shared_randomstreams
 from theano.tensor.nnet import softmax
-from theano.tensor.nnet import conv
-from theano.tensor.signal import downsample
+from theano.tensor.nnet import conv2d
+from theano.tensor.signal import pool
 
 #### Constants
 GPU = True
 if GPU:
     print("Trying to run under a GPU.  If this is not desired, then modify "+\
         "network3.py\nto set the GPU flag to False.")
-    try: theano.config.device = 'gpu'
+    try: theano.config.device = 'cuda'
     except: pass # it's already set
     theano.config.floatX = 'float32'
 else:
@@ -30,7 +30,7 @@ else:
 #### Load the MNIST data
 def load_data_shared(filename="../data/mnist.pkl.gz"):
     f = gzip.open(filename, 'rb')
-    training_data, validation_data, test_data = cPickle.load(f)
+    training_data, validation_data, test_data = cPickle.load(f,encoding="bytes")
     f.close()
     def shared(data):
         """Place the data into shared variables.  This allows Theano to copy
@@ -162,9 +162,9 @@ class ConvPoolLayer(object):
 
     def set_inpt(self, inpt, inpt_dropout):
         self.inpt = inpt.reshape(self.image_shape)
-        conv_out = conv.conv2d(
+        conv_out = conv2d(
             input=self.inpt, filters=self.w, filter_shape=self.filter_shape,image_shape=self.image_shape)
-        pooled_out = downsample.max_pool_2d(
+        pooled_out = pool.pool_2d(
             input=conv_out, ds=self.poolsize, ignore_border=True)
         self.output = self.activation_fn(
             pooled_out + self.b.dimshuffle('x', 0, 'x', 'x'))
@@ -303,7 +303,9 @@ class Network(object):
         training_accuracies, validation_accuracies,test_accuracies = [], [],[]
         for epoch in range(epochs):
             tmp=[[[],[],[]],[[],[],[]]]
-            for minibatch_index in range(num_training_batches):
+            for minibatch_index in range(int(num_training_batches)):
+                minibatch_index=int(minibatch_index)
+                # print(minibatch_index)
                 train_mb(minibatch_index)
                 cost_train=cost_train_mb(minibatch_index)
                 tmp[0][0].append(cost_train)
