@@ -371,6 +371,7 @@ class Network(object):
 
     def predict(self,target_x):
         target_x=np.broadcast_to(target_x,(self.mini_batch_size,target_x.shape[0]))
+        target_x=target_x.astype(theano.config.floatX)
         predict_mb=theano.function([],self.output_layer.y_out,givens={
             self.x:target_x
         })
